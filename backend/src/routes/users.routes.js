@@ -1,28 +1,37 @@
 const express = require('express');
 const router = express.Router();
-const auth = require("../middleware/auth");
-const users = [];
+const auth = require("../middleware/auth");//my middleware for authentication(centralized)
+const pool = require("../db");//my database
 
-router.post("/register",(req,res)=>{
+router.post("/register",async (req,res)=>{
     const { email , password} = req.body;
 
     if(!email || !password){
         return res.status(400).json({error: "email and password required"});
     }
 
-    users.push({email , password});
-    res.json({ message: "user registered"});
+    try{
+        await pool.query(
+            "INSERT INTO users (email,password) VALUES ($1,$2)",
+            [email,password]
+        );
+        res.json({ message: "user registered"});
+    }catch(err){
+        res.status(400).json({error:"user already exists"});
+    }
+    
 });
 
 const jwt = require("jsonwebtoken");
 
-router.post("/login",(req,res)=>{
+router.post("/login",async (req,res)=>{
     const { email , password } = req.body;
-
-    const user = users.find(
-        (u)=> u.email === email && u.password ===password
+    const result = await pool.query(
+        "SELECT * FROM users WHERE email = $1",
+        [email]
     );
-    if(!user){
+    const user = result.rows[0];
+    if(!user || user.password !== password){
         return res.status(401).json({error:"invalid credentials"});
     }
 
